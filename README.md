@@ -34,7 +34,7 @@ The service provides two APIs that return studies mentioning one concept/coordin
 GET /dissociate/terms/<term_a>/<term_b>
 ```
 
-Returns studies that mention **`term_a`** but **not** `term_b`.
+Returns studies that mention **`amygdala`** but **not** `hippocampus`.
 
 **Examples**
 
