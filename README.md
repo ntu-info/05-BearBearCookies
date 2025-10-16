@@ -74,20 +74,20 @@ Create a PostgreSQL database (e.g., on Render).
 ### 2) Verify the connection
 
 ```bash
-python check_db.py --url "postgresql://neurosynth_backend_25ne_user:ky4YDesCyLj7WEqWheGsDCZWsSvqVwVF@dpg-d3o5rbripnbc73fn5m3g-a.oregon-postgres.render.com/neurosynth_backend_25ne"
+python check_db.py --url "postgresql://<USER>:<PASSWORD>@<HOST>/<DATABASE>"
 ```
 
 ### 3) Populate the database
 
 ```bash
-python create_db.py --url "postgresql://neurosynth_backend_25ne_user:ky4YDesCyLj7WEqWheGsDCZWsSvqVwVF@dpg-d3o5rbripnbc73fn5m3g-a.oregon-postgres.render.com/neurosynth_backend_25ne"
+python create_db.py --url "postgresql://<USER>:<PASSWORD>@<HOST>/<DATABASE>"
 ```
 
 ### 4) Run the Flask service
 
 Deploy `app.py` as a Web Service (e.g., on Render) and set the environment variable:
 
-- `DB_URL=postgresql://neurosynth_backend_25ne_user:ky4YDesCyLj7WEqWheGsDCZWsSvqVwVF@dpg-d3o5rbripnbc73fn5m3g-a/neurosynth_backend_25ne`
+- `DB_URL=postgresql://<USER>:<PASSWORD>@<HOST>/<DATABASE>`
 
 Use a production server such as Gunicorn as your start command:
 
@@ -99,15 +99,15 @@ gunicorn app:app --bind 0.0.0.0:$PORT
 
 After deployment, check the basic endpoints:
 
-- Images: `https://ns-nano-23r3.onrender.com/img`
-- DB connectivity: `https://ns-nano-23r3.onrender.com/test_db`
+- Images: `https://ns-nano.onrender.com/img`
+- DB connectivity: `https://ns-nano.onrender.com/test_db`
 
 ---
 
 ## Environment Variables
 
 - **`DB_URL`** – Full PostgreSQL connection string used by the app.  
-  Example: `postgresql://neurosynth_backend_25ne_user:ky4YDesCyLj7WEqWheGsDCZWsSvqVwVF@dpg-d3o5rbripnbc73fn5m3g-a/neurosynth_backend_25ne`
+  Example: `postgresql://<USER>:<PASSWORD>@<HOST>/<DATABASE>`
 
 > **Security note:** Never commit real credentials to version control. Use environment variables or your hosting provider’s secret manager.
 
@@ -118,15 +118,15 @@ After deployment, check the basic endpoints:
 **By terms**
 
 ```bash
-curl https://ns-nano-23r3.onrender.com/dissociate/terms/amygdala/hippocampus
-curl https://ns-nano-23r3.onrender.com/dissociate/terms/hippocampus/amygdala
+curl https://ns-nano.onrender.com/dissociate/terms/amygdala/hippocampus
+curl https://ns-nano.onrender.com/dissociate/terms/hippocampus/amygdala
 ```
 
 **By coordinates**
 
 ```bash
-curl https://ns-nano-23r3.onrender.com/dissociate/locations/0_-52_26/-2_50_-6
-curl https://ns-nano-23r3.onrender.com/dissociate/locations/-2_50_-6/0_-52_26
+curl https://ns-nano.onrender.com/dissociate/locations/0_-52_26/-2_50_-6
+curl https://ns-nano.onrender.com/dissociate/locations/-2_50_-6/0_-52_26
 ```
 
 ---
