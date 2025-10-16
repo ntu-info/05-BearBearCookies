@@ -102,35 +102,32 @@ def create_app():
             with eng.begin() as conn:
                 conn.execute(text("SET search_path TO ns, public;"))
                 
-                # Convert terms to match database format
-                term_a_clean = term_a.lower().replace("-", "_")
-                term_b_clean = term_b.lower().replace("-", "_")
+                # Convert to database format
+                term_a_db = f"terms_abstract_tfidf__{term_a.lower().replace('-', '_')}"
+                term_b_db = f"terms_abstract_tfidf__{term_b.lower().replace('-', '_')}"
                 
-                # Query for A without B
-                query = text("""
-                    SELECT DISTINCT a1.study_id
-                    FROM ns.annotations_terms a1
-                    WHERE a1.term = :term_a
-                    AND a1.study_id NOT IN (
-                        SELECT study_id 
-                        FROM ns.annotations_terms 
-                        WHERE term = :term_b
-                    )
-                    LIMIT 100
+                # Get studies with term_a
+                query_a = text("""
+                    SELECT DISTINCT study_id 
+                    FROM ns.annotations_terms 
+                    WHERE term = :term
                 """)
                 
-                result = conn.execute(query, {
-                    "term_a": term_a_clean,
-                    "term_b": term_b_clean
-                }).fetchall()
+                result_a = conn.execute(query_a, {"term": term_a_db}).fetchall()
+                studies_a = set(row[0] for row in result_a)
                 
-                study_ids = [row[0] for row in result]
+                # Get studies with term_b
+                result_b = conn.execute(query_a, {"term": term_b_db}).fetchall()
+                studies_b = set(row[0] for row in result_b)
+                
+                # Calculate difference (A without B)
+                difference = studies_a - studies_b
                 
                 return jsonify({
                     "term_a": term_a,
                     "term_b": term_b,
-                    "studies_with_a_not_b": study_ids,
-                    "count": len(study_ids)
+                    "studies_with_a_not_b": list(difference)[:100],
+                    "count": len(difference)
                 })
                 
         except Exception as e:
@@ -152,46 +149,37 @@ def create_app():
             with eng.begin() as conn:
                 conn.execute(text("SET search_path TO ns, public;"))
                 
-                # Find studies near A but not near B
-                query = text("""
-                    SELECT DISTINCT c1.study_id
-                    FROM ns.coordinates c1
+                # Find studies near location A
+                query_a = text("""
+                    SELECT DISTINCT study_id 
+                    FROM ns.coordinates 
                     WHERE ST_DWithin(
-                        c1.geom, 
-                        ST_SetSRID(ST_MakePoint(:x1, :y1, :z1), 4326),
+                        geom, 
+                        ST_SetSRID(ST_MakePoint(:x, :y, :z), 4326),
                         10
                     )
-                    AND c1.study_id NOT IN (
-                        SELECT study_id 
-                        FROM ns.coordinates
-                        WHERE ST_DWithin(
-                            geom,
-                            ST_SetSRID(ST_MakePoint(:x2, :y2, :z2), 4326),
-                            10
-                        )
-                    )
-                    LIMIT 100
                 """)
                 
-                result = conn.execute(query, {
-                    "x1": x1, "y1": y1, "z1": z1,
-                    "x2": x2, "y2": y2, "z2": z2
-                }).fetchall()
+                result_a = conn.execute(query_a, {"x": x1, "y": y1, "z": z1}).fetchall()
+                studies_a = set(row[0] for row in result_a)
                 
-                study_ids = [row[0] for row in result]
+                # Find studies near location B
+                result_b = conn.execute(query_a, {"x": x2, "y": y2, "z": z2}).fetchall()
+                studies_b = set(row[0] for row in result_b)
+                
+                # Calculate difference (A without B)
+                difference = studies_a - studies_b
                 
                 return jsonify({
                     "location_a": [x1, y1, z1],
                     "location_b": [x2, y2, z2],
-                    "studies_near_a_not_b": study_ids,
-                    "count": len(study_ids),
+                    "studies_near_a_not_b": list(difference)[:100],
+                    "count": len(difference),
                     "radius_mm": 10
                 })
                 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-
-    return app
 
 # WSGI entry point (no __main__)
 app = create_app()
