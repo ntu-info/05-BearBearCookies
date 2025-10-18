@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurosynth Advanced Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .search-panel {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .search-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .controls {
+            padding: 20px 30px;
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .filter-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 10px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            padding: 8px 16px;
+            background: #e7f3ff;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #0066cc;
+        }
+        
+        .results {
+            padding: 30px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .study-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        
+        .study-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .study-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        
+        .study-id {
+            font-size: 0.85em;
+            color: #6c757d;
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        .weight-badge {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        
+        .study-title {
+            font-size: 1.1em;
+            color: #212529;
+            line-height: 1.6;
+            margin-top: 8px;
+        }
+        
+        .highlight {
+            background: yellow;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #6c757d;
+            font-size: 1.2em;
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: #adb5bd;
+        }
+        
+        .empty-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .sort-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .sort-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+        
+        .sort-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Neurosynth Advanced Search</h1>
+            <p>Functional Dissociation Analysis with Advanced Filtering</p>
+        </div>
+        
+        <div class="search-panel">
+            <div class="search-row">
+                <div class="input-group">
+                    <label for="termA">Term A (Include)</label>
+                    <input type="text" id="termA" placeholder="e.g., amygdala" value="amygdala">
+                </div>
+                
+                <div class="input-group">
+                    <label for="termB">Term B (Exclude)</label>
+                    <input type="text" id="termB" placeholder="e.g., hippocampus" value="hippocampus">
+                </div>
+                
+                <div class="input-group" style="display: flex; align-items: flex-end;">
+                    <button class="btn btn-primary" onclick="performSearch()">🔍 Search</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls" id="controls" style="display: none;">
+            <input 
+                type="text" 
+                id="filterInput" 
+                class="filter-input" 
+                placeholder="🔎 Filter results by keyword (e.g., emotional, fear, visual)..."
+                oninput="applyFilter()"
+            >
+            
+            <div class="stats">
+                <div class="stat-item">Total: <span id="totalCount">0</span></div>
+                <div class="stat-item">Filtered: <span id="filteredCount">0</span></div>
+            </div>
+            
+            <div>
+                <button class="sort-btn active" id="sortWeight" onclick="sortBy('weight')">Sort by Weight</button>
+                <button class="sort-btn" id="sortTitle" onclick="sortBy('title')">Sort by Title</button>
+            </div>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="empty">
+                <div class="empty-icon">🔬</div>
+                <h2>Enter search terms above to begin</h2>
+                <p>Example: Studies with "amygdala" but not "hippocampus"</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let allStudies = [];
+        let filteredStudies = [];
+        let currentSort = 'weight';
+        
+        async function performSearch() {
+            const termA = document.getElementById('termA').value.trim().replace(/ /g, '_');
+            const termB = document.getElementById('termB').value.trim().replace(/ /g, '_');
+            
+            if (!termA || !termB) {
+                alert('Please enter both terms');
+                return;
+            }
+            
+            document.getElementById('results').innerHTML = '<div class="loading">🔄 Searching...</div>';
+            document.getElementById('controls').style.display = 'none';
+            
+            try {
+                const response = await fetch(`/dissociate/terms/${termA}/${termB}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('results').innerHTML = 
+                        `<div class="empty"><div class="empty-icon">❌</div><h2>Error</h2><p>${data.error}</p></div>`;
+                    return;
+                }
+                
+                allStudies = data.results || [];
+                filteredStudies = [...allStudies];
+                
+                document.getElementById('totalCount').textContent = data.total_count;
+                document.getElementById('filteredCount').textContent = filteredStudies.length;
+                document.getElementById('controls').style.display = 'flex';
+                document.getElementById('filterInput').value = '';
+                
+                renderResults();
+                
+            } catch (error) {
+                document.getElementById('results').innerHTML = 
+                    `<div class="empty"><div class="empty-icon">❌</div><h2>Error</h2><p>${error.message}</p></div>`;
+            }
+        }
+        
+        function applyFilter() {
+            const filterText = document.getElementById('filterInput').value.toLowerCase();
+            
+            if (!filterText) {
+                filteredStudies = [...allStudies];
+            } else {
+                filteredStudies = allStudies.filter(study => 
+                    study.title.toLowerCase().includes(filterText) ||
+                    study.study_id.includes(filterText)
+                );
+            }
+            
+            document.getElementById('filteredCount').textContent = filteredStudies.length;
+            renderResults();
+        }
+        
+        function sortBy(field) {
+            currentSort = field;
+            
+            document.getElementById('sortWeight').classList.remove('active');
+            document.getElementById('sortTitle').classList.remove('active');
+            document.getElementById(`sort${field.charAt(0).toUpperCase() + field.slice(1)}`).classList.add('active');
+            
+            if (field === 'weight') {
+                filteredStudies.sort((a, b) => b.weight - a.weight);
+            } else {
+                filteredStudies.sort((a, b) => a.title.localeCompare(b.title));
+            }
+            
+            renderResults();
+        }
+        
+        function renderResults() {
+            const resultsDiv = document.getElementById('results');
+            const filterText = document.getElementById('filterInput').value.toLowerCase();
+            
+            if (filteredStudies.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">🔍</div>
+                        <h2>No results found</h2>
+                        <p>Try adjusting your filter or search terms</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            filteredStudies.forEach(study => {
+                let title = study.title;
+                
+                if (filterText) {
+                    const regex = new RegExp(`(${filterText})`, 'gi');
+                    title = title.replace(regex, '<span class="highlight">$1</span>');
+                }
+                
+                html += `
+                    <div class="study-card">
+                        <div class="study-header">
+                            <span class="study-id">ID: ${study.study_id}</span>
+                            ${study.weight > 0 ? `<span class="weight-badge">Weight: ${study.weight.toFixed(3)}</span>` : ''}
+                        </div>
+                        <div class="study-title">${title}</div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Allow Enter key to search
+        document.getElementById('termA').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+        
+        document.getElementById('termB').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+    </script>
+</body>
+</html>
