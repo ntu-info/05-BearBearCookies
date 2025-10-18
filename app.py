@@ -69,7 +69,6 @@ def create_app():
                     payload["coordinates_sample"] = []
 
                 try:
-                    # Select a few columns if they exist; otherwise select a generic subset
                     rows = conn.execute(text("SELECT * FROM ns.metadata LIMIT 3")).mappings().all()
                     payload["metadata_sample"] = [dict(r) for r in rows]
                 except Exception:
@@ -103,7 +102,7 @@ def create_app():
             with eng.begin() as conn:
                 conn.execute(text("SET search_path TO ns, public;"))
                 
-                # 查詢邏輯：同時搜尋 title 和 abstract
+                # Query logic: search both title and abstract
                 query_template = text("""
                     SELECT DISTINCT m.study_id, m.title
                     FROM ns.metadata m
@@ -114,34 +113,34 @@ def create_app():
                         at.term = :term_tfidf
                 """)
                 
-                # 準備參數
+                # Prepare parameters
                 term_a_pattern = f"%{term_a.replace('_', ' ')}%"
                 term_a_tfidf = f"terms_abstract_tfidf__{term_a.lower().replace('-', '_')}"
                 
                 term_b_pattern = f"%{term_b.replace('_', ' ')}%"
                 term_b_tfidf = f"terms_abstract_tfidf__{term_b.lower().replace('-', '_')}"
                 
-                # 查詢包含 term_a 的研究
+                # Query studies with term_a
                 result_a = conn.execute(
                     query_template, 
                     {"term_pattern": term_a_pattern, "term_tfidf": term_a_tfidf}
                 ).fetchall()
-                studies_a = {row[0]: row[1] for row in result_a}  # {study_id: title}
+                studies_a = {row[0]: row[1] for row in result_a}
                 
-                # 查詢包含 term_b 的研究
+                # Query studies with term_b
                 result_b = conn.execute(
                     query_template,
                     {"term_pattern": term_b_pattern, "term_tfidf": term_b_tfidf}
                 ).fetchall()
                 studies_b = set(row[0] for row in result_b)
                 
-                # 集合運算：A - B
+                # Set operation: A - B
                 difference_ids = set(studies_a.keys()) - studies_b
                 
-                # 取得詳細資訊（包含 weight）
+                # Get detailed information including weight
                 detailed_results = []
                 for study_id in difference_ids:
-                    # 取得這個 study 的 term_a weight
+                    # Get weight for term_a in this study
                     weight_query = text("""
                         SELECT weight 
                         FROM ns.annotations_terms 
@@ -159,14 +158,14 @@ def create_app():
                         "weight": float(weight_result[0]) if weight_result else 0.0
                     })
                 
-                # 按 weight 降冪排序
+                # Sort by weight descending
                 detailed_results.sort(key=lambda x: x['weight'], reverse=True)
                 
                 return jsonify({
                     "term_a": term_a,
                     "term_b": term_b,
                     "total_count": len(detailed_results),
-                    "results": detailed_results  # 返回全部，前端處理分頁
+                    "results": detailed_results
                 })
                 
         except Exception as e:
@@ -225,6 +224,6 @@ def create_app():
             return jsonify({"error": str(e)}), 500
 
     return app
-# WSGI entry point (no __main__)
 
+# WSGI entry point
 app = create_app()
