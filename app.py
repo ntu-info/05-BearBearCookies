@@ -90,48 +90,86 @@ def create_app():
             payload["error"] = str(e)
             return jsonify(payload), 500
 
-    # ADD THE DISSOCIATION ENDPOINTS HERE (with proper indentation)
-    @app.get("/dissociate/terms/<term_a>/<term_b>", endpoint="dissociate_terms")
-    def dissociate_terms(term_a, term_b):
-        """
-        Returns studies that mention term_a but NOT term_b
-        """
-        eng = get_engine()
-        
-        try:
-            with eng.begin() as conn:
-                conn.execute(text("SET search_path TO ns, public;"))
-                
-                # Convert to database format
-                term_a_db = f"terms_abstract_tfidf__{term_a.lower().replace('-', '_')}"
-                term_b_db = f"terms_abstract_tfidf__{term_b.lower().replace('-', '_')}"
-                
-                # Get studies with term_a
-                query_a = text("""
-                    SELECT DISTINCT study_id 
+@app.get("/dissociate/terms/<term_a>/<term_b>", endpoint="dissociate_terms")
+def dissociate_terms(term_a, term_b):
+    """
+    Returns studies that mention term_a (in title OR abstract) 
+    but NOT term_b (in title OR abstract)
+    """
+    eng = get_engine()
+    
+    try:
+        with eng.begin() as conn:
+            conn.execute(text("SET search_path TO ns, public;"))
+            
+            # 🔥 關鍵改進：同時查詢 title 和 abstract
+            # 使用 ILIKE 進行不區分大小寫的模糊匹配
+            query_template = text("""
+                SELECT DISTINCT m.study_id, m.title
+                FROM ns.metadata m
+                LEFT JOIN ns.annotations_terms at ON m.study_id = at.study_id
+                WHERE 
+                    -- 在 title 中找 (原始輸入格式)
+                    m.title ILIKE :term_pattern
+                    OR 
+                    -- 在 abstract annotations 中找 (TF-IDF 格式)
+                    at.term = :term_tfidf
+            """)
+            
+            # 準備搜尋參數
+            term_a_pattern = f"%{term_a.replace('_', ' ')}%"  # "posterior_cingulate" -> "%posterior cingulate%"
+            term_a_tfidf = f"terms_abstract_tfidf__{term_a.lower().replace('-', '_')}"
+            
+            term_b_pattern = f"%{term_b.replace('_', ' ')}%"
+            term_b_tfidf = f"terms_abstract_tfidf__{term_b.lower().replace('-', '_')}"
+            
+            # 查詢包含 term_a 的研究
+            result_a = conn.execute(
+                query_template, 
+                {"term_pattern": term_a_pattern, "term_tfidf": term_a_tfidf}
+            ).fetchall()
+            studies_a = {row[0]: row[1] for row in result_a}  # {study_id: title}
+            
+            # 查詢包含 term_b 的研究
+            result_b = conn.execute(
+                query_template,
+                {"term_pattern": term_b_pattern, "term_tfidf": term_b_tfidf}
+            ).fetchall()
+            studies_b = set(row[0] for row in result_b)
+            
+            # 集合運算：A - B（有 A 但沒有 B）
+            difference_ids = set(studies_a.keys()) - studies_b
+            
+            # 🎁 加碼：返回詳細資訊（含 title 和 weight）
+            detailed_results = []
+            for study_id in list(difference_ids)[:100]:  # 限制 100 筆
+                # 取得這個 study 的 term_a weight（如果有的話）
+                weight_query = text("""
+                    SELECT weight 
                     FROM ns.annotations_terms 
-                    WHERE term = :term
+                    WHERE study_id = :sid AND term = :term
+                    LIMIT 1
                 """)
+                weight_result = conn.execute(
+                    weight_query, 
+                    {"sid": study_id, "term": term_a_tfidf}
+                ).fetchone()
                 
-                result_a = conn.execute(query_a, {"term": term_a_db}).fetchall()
-                studies_a = set(row[0] for row in result_a)
-                
-                # Get studies with term_b
-                result_b = conn.execute(query_a, {"term": term_b_db}).fetchall()
-                studies_b = set(row[0] for row in result_b)
-                
-                # Calculate difference (A without B)
-                difference = studies_a - studies_b
-                
-                return jsonify({
-                    "term_a": term_a,
-                    "term_b": term_b,
-                    "studies_with_a_not_b": list(difference)[:100],
-                    "count": len(difference)
+                detailed_results.append({
+                    "study_id": study_id,
+                    "title": studies_a[study_id],
+                    "weight": weight_result[0] if weight_result else None
                 })
-                
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            
+            return jsonify({
+                "term_a": term_a,
+                "term_b": term_b,
+                "total_count": len(difference_ids),
+                "results": detailed_results
+            })
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
     @app.get("/dissociate/locations/<coords_a>/<coords_b>", endpoint="dissociate_locations")
     def dissociate_locations(coords_a, coords_b):
