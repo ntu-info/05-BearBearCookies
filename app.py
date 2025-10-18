@@ -95,6 +95,7 @@ def create_app():
         """
         Returns studies that mention term_a (in title OR abstract) 
         but NOT term_b (in title OR abstract)
+        With full details: study_id, title, weight
         """
         eng = get_engine()
         
@@ -102,22 +103,19 @@ def create_app():
             with eng.begin() as conn:
                 conn.execute(text("SET search_path TO ns, public;"))
                 
-                # 🔥 關鍵改進：同時查詢 title 和 abstract
-                # 使用 ILIKE 進行不區分大小寫的模糊匹配
+                # 查詢邏輯：同時搜尋 title 和 abstract
                 query_template = text("""
                     SELECT DISTINCT m.study_id, m.title
                     FROM ns.metadata m
                     LEFT JOIN ns.annotations_terms at ON m.study_id = at.study_id
                     WHERE 
-                        -- 在 title 中找 (原始輸入格式)
                         m.title ILIKE :term_pattern
                         OR 
-                        -- 在 abstract annotations 中找 (TF-IDF 格式)
                         at.term = :term_tfidf
                 """)
                 
-                # 準備搜尋參數
-                term_a_pattern = f"%{term_a.replace('_', ' ')}%"  # "posterior_cingulate" -> "%posterior cingulate%"
+                # 準備參數
+                term_a_pattern = f"%{term_a.replace('_', ' ')}%"
                 term_a_tfidf = f"terms_abstract_tfidf__{term_a.lower().replace('-', '_')}"
                 
                 term_b_pattern = f"%{term_b.replace('_', ' ')}%"
@@ -137,13 +135,13 @@ def create_app():
                 ).fetchall()
                 studies_b = set(row[0] for row in result_b)
                 
-                # 集合運算：A - B（有 A 但沒有 B）
+                # 集合運算：A - B
                 difference_ids = set(studies_a.keys()) - studies_b
                 
-                # 🎁 加碼：返回詳細資訊（含 title 和 weight）
+                # 取得詳細資訊（包含 weight）
                 detailed_results = []
-                for study_id in list(difference_ids)[:100]:  # 限制 100 筆
-                    # 取得這個 study 的 term_a weight（如果有的話）
+                for study_id in difference_ids:
+                    # 取得這個 study 的 term_a weight
                     weight_query = text("""
                         SELECT weight 
                         FROM ns.annotations_terms 
@@ -157,20 +155,27 @@ def create_app():
                     
                     detailed_results.append({
                         "study_id": study_id,
-                        "title": studies_a[study_id],
-                        "weight": weight_result[0] if weight_result else None
+                        "title": studies_a[study_id] or "No title available",
+                        "weight": float(weight_result[0]) if weight_result else 0.0
                     })
+                
+                # 按 weight 降冪排序
+                detailed_results.sort(key=lambda x: x['weight'], reverse=True)
                 
                 return jsonify({
                     "term_a": term_a,
                     "term_b": term_b,
-                    "total_count": len(difference_ids),
-                    "results": detailed_results
+                    "total_count": len(detailed_results),
+                    "results": detailed_results  # 返回全部，前端處理分頁
                 })
                 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-
+        
+    @app.get("/search", endpoint="search_page")
+    def search_page():
+        return send_file("search.html")    
+    
     @app.get("/dissociate/locations/<coords_a>/<coords_b>", endpoint="dissociate_locations")
     def dissociate_locations(coords_a, coords_b):
         """
@@ -218,6 +223,8 @@ def create_app():
                 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
     return app
 # WSGI entry point (no __main__)
+
 app = create_app()
